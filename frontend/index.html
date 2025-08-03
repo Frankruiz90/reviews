@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Reseñas App</title>
+   <style>
+  body {
+    font-family: 'Segoe UI', sans-serif;
+    background: #f4f6f8;
+    color: #333;
+    margin: 0;
+    padding: 20px;
+    max-width: 100%;
+  }
+
+  .container {
+    max-width: 600px;
+    margin: auto;
+  }
+
+  h2 {
+    border-left: 4px solid #0077cc;
+    padding-left: 10px;
+    color: #0077cc;
+    margin-top: 30px;
+  }
+
+  form {
+    background: #fff;
+    padding: 15px;
+    margin-bottom: 20px;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  }
+
+  input, textarea, button {
+    width: 100%;
+    padding: 10px;
+    margin-top: 8px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    font-size: 1em;
+    box-sizing: border-box;
+  }
+
+  button {
+    background-color: #0077cc;
+    color: white;
+    border: none;
+    cursor: pointer;
+    transition: background 0.3s ease;
+  }
+
+  button:hover {
+    background-color: #005fa3;
+  }
+
+  .alert {
+    padding: 10px;
+    margin-top: 10px;
+    background-color: #e0f7e9;
+    border: 1px solid #1abc9c;
+    color: #2c3e50;
+    border-radius: 5px;
+  }
+
+  .error {
+    background-color: #ffe6e6;
+    border-color: #e74c3c;
+    color: #c0392b;
+  }
+
+  ul {
+    list-style: none;
+    padding: 0;
+  }
+
+  li {
+    background: #fff;
+    margin-bottom: 10px;
+    padding: 12px;
+    border-radius: 6px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    word-wrap: break-word;
+  }
+
+  em {
+    color: #666;
+    font-size: 0.85em;
+  }
+
+  /* ✅ Diseño responsive */
+  @media screen and (max-width: 600px) {
+    body {
+      padding: 10px;
+    }
+
+    form {
+      padding: 10px;
+    }
+
+    h2 {
+      font-size: 1.2em;
+    }
+
+    button {
+      font-size: 1em;
+    }
+  }
+</style>
+
+  </head>
+  <body>
+    <h2>Registro</h2>
+    <form id="registerForm">
+      <input type="text" id="regName" placeholder="Nombre completo" required />
+      <input
+        type="email"
+        id="regEmail"
+        placeholder="Correo electrónico"
+        required
+      />
+      <input type="password" id="regPass" placeholder="Contraseña" required />
+      <button type="submit">Registrarse</button>
+      <div id="registerAlert"></div>
+    </form>
+
+    <h2>Inicio de Sesión</h2>
+    <form id="loginForm">
+      <input
+        type="email"
+        id="loginEmail"
+        placeholder="Correo electrónico"
+        required
+      />
+      <input type="password" id="loginPass" placeholder="Contraseña" required />
+      <button type="submit">Ingresar</button>
+      <div id="loginAlert"></div>
+    </form>
+
+    <h2>Escribir Reseña</h2>
+    <form id="reviewForm">
+      <textarea
+        id="content"
+        placeholder="Escribe tu reseña aquí..."
+        required
+      ></textarea>
+      <button type="submit">Publicar Reseña</button>
+      <div id="reviewAlert"></div>
+    </form>
+
+    <h2>Reseñas Recientes</h2>
+    <ul id="reviewList"></ul>
+
+    <h2>Panel de Administración</h2>
+    <ul id="adminReviewList"></ul>
+
+    <script>
+      const API = "http://localhost:3000";
+      let token = "";
+
+      function mostrarAlerta(id, mensaje, tipo = "ok") {
+        const contenedor = document.getElementById(id);
+        contenedor.innerHTML = `<div class="alert ${
+          tipo === "error" ? "error" : ""
+        }">${mensaje}</div>`;
+        setTimeout(() => (contenedor.innerHTML = ""), 4000);
+      }
+
+      // Registro
+      document
+        .getElementById("registerForm")
+        .addEventListener("submit", async (e) => {
+          e.preventDefault();
+          const name = document.getElementById("regName").value.trim();
+          const email = document.getElementById("regEmail").value.trim();
+          const password = document.getElementById("regPass").value.trim();
+
+          if (!name || !email || !password) {
+            mostrarAlerta(
+              "registerAlert",
+              "Todos los campos son obligatorios",
+              "error"
+            );
+            return;
+          }
+
+          const res = await fetch(`${API}/register`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ name, email, password }),
+          });
+
+          const data = await res.json();
+          if (res.ok) {
+            mostrarAlerta("registerAlert", "Registro exitoso");
+            document.getElementById("registerForm").reset();
+          } else {
+            mostrarAlerta(
+              "registerAlert",
+              data.error || "Error al registrar",
+              "error"
+            );
+          }
+        });
+
+      // Login
+      document
+        .getElementById("loginForm")
+        .addEventListener("submit", async (e) => {
+          e.preventDefault();
+          const email = document.getElementById("loginEmail").value.trim();
+          const password = document.getElementById("loginPass").value.trim();
+
+          const res = await fetch(`${API}/login`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ email, password }),
+          });
+
+          const data = await res.json();
+          if (res.ok) {
+            token = data.token;
+            mostrarAlerta("loginAlert", "Sesión iniciada correctamente");
+            document.getElementById("loginForm").reset();
+            if (data.user.is_admin) {
+              cargarPanelAdmin();
+            }
+          } else {
+            mostrarAlerta(
+              "loginAlert",
+              data.error || "Error de autenticación",
+              "error"
+            );
+          }
+        });
+
+      // Enviar reseña
+      document
+        .getElementById("reviewForm")
+        .addEventListener("submit", async (e) => {
+          e.preventDefault();
+          const content = document.getElementById("content").value.trim();
+          if (!token) {
+            mostrarAlerta(
+              "reviewAlert",
+              "Primero debes iniciar sesión",
+              "error"
+            );
+            return;
+          }
+
+          const res = await fetch(`${API}/reviews`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: "Bearer " + token,
+            },
+            body: JSON.stringify({ content }),
+          });
+
+          const data = await res.json();
+          if (res.ok) {
+            mostrarAlerta("reviewAlert", "Reseña publicada correctamente");
+            document.getElementById("reviewForm").reset();
+            cargarReseñas();
+          } else {
+            mostrarAlerta(
+              "reviewAlert",
+              data.error || "Error al guardar reseña",
+              "error"
+            );
+          }
+        });
+
+      // Mostrar reseñas
+      async function cargarReseñas() {
+        const res = await fetch(`${API}/reviews`);
+        const data = await res.json();
+
+        const list = document.getElementById("reviewList");
+        list.innerHTML = "";
+
+        data.forEach((r) => {
+          const fecha = new Date(r.created_at).toLocaleString("es-CO");
+          const li = document.createElement("li");
+          li.innerHTML = `<strong>${r.user_name}</strong>: ${r.content} <em>(${fecha})</em>`;
+          list.appendChild(li);
+        });
+      }
+
+      async function cargarPanelAdmin() {
+        if (!token) return;
+
+        try {
+          const res = await fetch(`${API}/reviews`);
+          const data = await res.json();
+
+          const panel = document.getElementById("adminReviewList");
+          panel.innerHTML = "";
+
+          data.forEach((r) => {
+            const li = document.createElement("li");
+            const fecha = new Date(r.created_at).toLocaleString("es-CO");
+
+            li.innerHTML = `
+        <strong>${r.user_name}</strong>: ${r.content}
+        <em>(${fecha})</em>
+        <button onclick="eliminarReseña(${r.id})" style="float:right; background:red; color:white; border:none; border-radius:4px; padding:5px;">Eliminar</button>
+      `;
+
+            panel.appendChild(li);
+          });
+        } catch (error) {
+          console.error("Error cargando panel admin:", error);
+        }
+      }
+
+      async function eliminarReseña(id) {
+        const confirmacion = confirm("¿Estás seguro de eliminar esta reseña?");
+        if (!confirmacion) return;
+
+        try {
+          const res = await fetch(`${API}/reviews/${id}`, {
+            method: "DELETE",
+            headers: {
+              Authorization: "Bearer " + token,
+            },
+          });
+
+          const data = await res.json();
+          if (res.ok) {
+            alert("Reseña eliminada");
+            cargarReseñas();
+            cargarPanelAdmin();
+          } else {
+            alert(data.error || "No autorizado");
+          }
+        } catch (error) {
+          console.error("Error al eliminar:", error);
+        }
+      }
+
+      cargarReseñas();
+    </script>
+  </body>
+</html>
